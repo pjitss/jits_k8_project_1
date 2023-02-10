@@ -1,11 +1,29 @@
-FROM  centos:latest
-#MAINTAINER monuprajith47@gmail.com
-RUN echo "hello prajeet"
-ADD https://www.free-css.com/assets/files/free-css-templates/download/page254/photogenic.zip /var/www/html/
-WORKDIR /var/www/html/
-RUN ls -l /var/www/html
-RUN unzip photogenic.zip
-RUN cp -rvf photogenic/* .
-RUN rm -rf photogenic photogenic.zip
-CMD ["/bin/bash", "/usr/sbin/httpd", "-D", "FOREGROUND"]
-EXPOSE 80 22
+# Webserver container with CGI python script
+# Using RHEL 7 base image and Apache Web server
+# Version 1
+
+# Pull the rhel image from the local registry
+FROM rhel7:latest
+USER root
+
+MAINTAINER Maintainer_Name
+
+# Fix per https://bugzilla.redhat.com/show_bug.cgi?id=1192200
+RUN yum -y install deltarpm yum-utils --disablerepo=*-eus-* --disablerepo=*-htb-* *-sjis-*\
+    --disablerepo=*-ha-* --disablerepo=*-rt-* --disablerepo=*-lb-* --disablerepo=*-rs-* --disablerepo=*-sap-*
+
+RUN yum-config-manager --disable *-eus-* *-htb-* *-ha-* *-rt-* *-lb-* *-rs-* *-sap-* *-sjis* > /dev/null
+
+# Update image
+RUN yum install httpd procps-ng MySQL-python -y
+
+# Add configuration file
+ADD action /var/www/cgi-bin/action
+RUN echo "PassEnv DB_SERVICE_SERVICE_HOST" >> /etc/httpd/conf/httpd.conf
+RUN chown root:apache /var/www/cgi-bin/action
+RUN chmod 755 /var/www/cgi-bin/action
+RUN echo "The Web Server is Running" > /var/www/html/index.html
+EXPOSE 80
+
+# Start the service
+CMD mkdir /run/httpd ; /usr/sbin/httpd -D FOREGROUNDv
