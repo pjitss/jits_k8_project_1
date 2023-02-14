@@ -1,0 +1,53 @@
+pipeline {
+    agent any
+    environment {
+        PATH = "/opt/maven/apache-maven-3.8.7/bin:$PATH"
+        NEXUS_VERSION = "nexus3"
+        NEXUS_PROTOCOL = "http"
+        NEXUS_URL = "192.168.0.193:8081"
+        NEXUS_REPOSITORY = "jitsNex-release"
+        NEXUS_REPO_ID = "jitsNex-release"
+        NEXUS_CREDENTIAL_ID = "nexus_cred"
+        ARTVERSION = "${env.BUILD_ID}"
+    }
+    stages {
+        stage("hello"){
+            steps{
+                echo "hello prajeet, welcome to AbuDhabi"
+            }
+        }
+        stage("git clone"){
+            steps{
+                checkout scmGit(branches: [[name: '*/jitsdemo']], extensions: [], userRemoteConfigs: [[credentialsId: 'git_cred', url: 'https://github.com/pjitss/jits_k8_project_1.git']])
+            }
+        }
+        stage("maven install"){
+            steps{
+                sh "mvn clean install"
+            }
+        }
+        stage('docker image build'){
+            steps{
+                sh "docker build -t jitss/kubernetes ."
+            }
+        }
+        stage('Push image to hub'){
+            steps{
+                script{
+                    withCredentials([string(credentialsId: 'dockerpasswd', variable: 'dockerhubpasswd')]) {
+                    sh "docker login -u jitss -p ${dockerhubpasswd}"
+                        
+                    }
+                    sh "docker push jitss/kubernetes"
+                }
+            }
+        }
+        stage('Deploy to k8'){
+            steps{
+                script{
+                    kubernetesDeploy (configs: 'deploymentservice.yaml',kubeconfigId: 'kubeconfig')
+                }
+            }
+        }
+    }
+}
